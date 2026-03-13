@@ -2,6 +2,8 @@ import com.projectsbynipin.passwordruleengine.dto.ApiResponse
 import com.projectsbynipin.passwordruleengine.exception.FailedToCheckPasswordException
 import com.projectsbynipin.passwordruleengine.service.PasswordService
 import com.projectsbynipin.passwordruleengine.service.impl.PasswordServiceImpl
+import org.codehaus.groovy.control.CompilerConfiguration
+import org.codehaus.groovy.control.customizers.SecureASTCustomizer
 import spock.lang.Specification
 
 class PasswordTests extends Specification {
@@ -9,7 +11,18 @@ class PasswordTests extends Specification {
     PasswordService passwordService;
 
     def setup() {
-        passwordService = new PasswordServiceImpl();
+        CompilerConfiguration compilerConfiguration = new CompilerConfiguration();
+        SecureASTCustomizer secureASTCustomizer = new SecureASTCustomizer();
+        secureASTCustomizer.setAllowedImports(Collections.emptyList());
+        secureASTCustomizer.setAllowedReceiversClasses(
+                List.of(
+                        String.class,
+                        Math.class,
+                        Object.class
+                )
+        );
+        compilerConfiguration.addCompilationCustomizers(secureASTCustomizer);
+        passwordService = new PasswordServiceImpl(compilerConfiguration);
         passwordService.scriptPath = "../scripts"
     }
 
@@ -80,5 +93,19 @@ class PasswordTests extends Specification {
         passwordService.checkPasswordStrength("Abcd1234")
         then:
         thrown(FailedToCheckPasswordException)
+    }
+
+    def "Malicious scripts throw Security Exception"() {
+        given: "A script that executes System.exit(0)"
+        File testFile = new File("../scripts/security_tester.groovy");
+        testFile.text = "System.exit(0)"
+        when:
+        passwordService.checkPasswordStrength("Abcd1234")
+        then:
+        thrown(SecurityException)
+        cleanup: "Deleting the test file"
+        if (testFile.exists()) {
+            testFile.delete()
+        }
     }
 }

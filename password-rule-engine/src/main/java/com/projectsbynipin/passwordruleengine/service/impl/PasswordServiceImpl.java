@@ -8,6 +8,8 @@ import com.projectsbynipin.passwordruleengine.utils.Constants;
 import groovy.lang.Binding;
 import groovy.lang.GroovyShell;
 import lombok.Setter;
+import org.codehaus.groovy.control.CompilerConfiguration;
+import org.codehaus.groovy.control.MultipleCompilationErrorsException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -22,6 +24,12 @@ public class PasswordServiceImpl implements PasswordService {
     @Value("${scripts.path}")
     public String scriptPath;
 
+    private final CompilerConfiguration compilerConfiguration;
+
+    public PasswordServiceImpl(CompilerConfiguration compilerConfiguration) {
+        this.compilerConfiguration = compilerConfiguration;
+    }
+
     @Override
     public ApiResponse<?> checkPasswordStrength(String password) {
         try {
@@ -33,12 +41,16 @@ public class PasswordServiceImpl implements PasswordService {
             if (files == null || files.length == 0) {
                 throw new FailedToCheckPasswordException(Constants.FAILED_TO_CHECK_PASSWORD);
             }
-            Binding binding = new Binding();
-            binding.setVariable("password", password);
-            GroovyShell groovyShell = new GroovyShell(binding);
             List<String> messages = new ArrayList<>();
             boolean passwordStrong = true;
             for (File file : files) {
+                Binding binding = new Binding();
+                binding.setVariable("password", password);
+                GroovyShell groovyShell = new GroovyShell(
+                        this.getClass().getClassLoader(),
+                        binding,
+                        compilerConfiguration
+                );
                 groovyShell.evaluate(file);
                 boolean isEnabled = (boolean) binding.getVariable("enabled");
                 if (isEnabled) {
@@ -54,9 +66,10 @@ public class PasswordServiceImpl implements PasswordService {
             } else {
                 return ApiResponseCreator.success(passwordStrong, Constants.PASSWORD_CHECKED, messages);
             }
+        } catch (MultipleCompilationErrorsException e) {
+            throw new SecurityException("Security Error");
         } catch (Exception e) {
             throw new FailedToCheckPasswordException(Constants.FAILED_TO_CHECK_PASSWORD);
         }
-
     }
 }
