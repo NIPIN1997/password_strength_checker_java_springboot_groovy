@@ -5,7 +5,7 @@ This project is a **dynamic password validation service** built using Spring Boo
 
 ## Features
 - REST API for password strength checks
-- Dynamic scripting using GroovyShell
+- Sandboxed dynamic scripting using GroovyShell and SecureASTCustomizer
 - Unit tests with Spock Framework
 - Swagger UI for API documentation
 - Dockerized with volume mounting for external scripts
