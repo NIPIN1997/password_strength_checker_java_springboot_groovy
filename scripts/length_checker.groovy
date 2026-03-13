@@ -1,4 +1,5 @@
 enabled = true
+String password=password
 if (password.length() >= 8) {
     passed = true
 } else {

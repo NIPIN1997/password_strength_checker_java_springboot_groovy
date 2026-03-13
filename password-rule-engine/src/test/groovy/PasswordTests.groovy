@@ -17,8 +17,7 @@ class PasswordTests extends Specification {
         secureASTCustomizer.setAllowedReceiversClasses(
                 List.of(
                         String.class,
-                        Math.class,
-                        Object.class
+                        Math.class
                 )
         );
         compilerConfiguration.addCompilationCustomizers(secureASTCustomizer);
