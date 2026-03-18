@@ -16,6 +16,11 @@ This project is a **dynamic password validation service** built using Spring Boo
 - **Secure Sandbox**: Uses `SecureASTCustomizer` to block malicious code.
 
 ## Build & Run
+
+### Prerequisites
+- Java 21 JDK
+- Docker
+
 Navigate to password-rule-engine folder
 ```bash
 cd password-rule-engine
