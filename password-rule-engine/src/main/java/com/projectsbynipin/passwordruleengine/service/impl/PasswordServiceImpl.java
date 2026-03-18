@@ -3,55 +3,45 @@ package com.projectsbynipin.passwordruleengine.service.impl;
 import com.projectsbynipin.passwordruleengine.dto.ApiResponse;
 import com.projectsbynipin.passwordruleengine.exception.FailedToCheckPasswordException;
 import com.projectsbynipin.passwordruleengine.service.PasswordService;
+import com.projectsbynipin.passwordruleengine.service.engine.GroovyRuleManager;
 import com.projectsbynipin.passwordruleengine.utils.ApiResponseCreator;
 import com.projectsbynipin.passwordruleengine.utils.Constants;
 import groovy.lang.Binding;
-import groovy.lang.GroovyShell;
-import lombok.Setter;
-import org.codehaus.groovy.control.CompilerConfiguration;
-import org.codehaus.groovy.control.MultipleCompilationErrorsException;
-import org.springframework.beans.factory.annotation.Value;
+import groovy.lang.Script;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.io.File;
+import java.io.FileNotFoundException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class PasswordServiceImpl implements PasswordService {
 
-    @Setter
-    @Value("${scripts.path}")
-    public String scriptPath;
+    private final GroovyRuleManager groovyRuleManager;
+    private static final Logger logger = LoggerFactory.getLogger(PasswordServiceImpl.class);
 
-    private final CompilerConfiguration compilerConfiguration;
-
-    public PasswordServiceImpl(CompilerConfiguration compilerConfiguration) {
-        this.compilerConfiguration = compilerConfiguration;
+    public PasswordServiceImpl(GroovyRuleManager groovyRuleManager) {
+        this.groovyRuleManager = groovyRuleManager;
     }
 
     @Override
     public ApiResponse<?> checkPasswordStrength(String password) {
         try {
-            File folder = new File(scriptPath);
-            if (!folder.exists()) {
-                throw new FailedToCheckPasswordException(Constants.FAILED_TO_CHECK_PASSWORD);
-            }
-            File[] files = folder.listFiles((dir, name) -> name.endsWith(".groovy"));
-            if (files == null || files.length == 0) {
-                throw new FailedToCheckPasswordException(Constants.FAILED_TO_CHECK_PASSWORD);
+            Map<String, Class<?>> scripts = groovyRuleManager.getScripts();
+            if (scripts.isEmpty()) {
+                throw new FileNotFoundException("No script found.");
             }
             List<String> messages = new ArrayList<>();
             boolean passwordStrong = true;
-            for (File file : files) {
+            for (Class<?> scriptClass : scripts.values()) {
+                Script script = (Script) scriptClass.getDeclaredConstructor().newInstance();
                 Binding binding = new Binding();
                 binding.setVariable("password", password);
-                GroovyShell groovyShell = new GroovyShell(
-                        this.getClass().getClassLoader(),
-                        binding,
-                        compilerConfiguration
-                );
-                groovyShell.evaluate(file);
+                script.setBinding(binding);
+                script.run();
                 boolean isEnabled = (boolean) binding.getVariable("enabled");
                 if (isEnabled) {
                     boolean isPassed = (boolean) binding.getVariable("passed");
@@ -66,9 +56,8 @@ public class PasswordServiceImpl implements PasswordService {
             } else {
                 return ApiResponseCreator.success(passwordStrong, Constants.PASSWORD_CHECKED, messages);
             }
-        } catch (MultipleCompilationErrorsException e) {
-            throw new SecurityException("Security Error");
         } catch (Exception e) {
+            logger.error(e.getMessage());
             throw new FailedToCheckPasswordException(Constants.FAILED_TO_CHECK_PASSWORD);
         }
     }

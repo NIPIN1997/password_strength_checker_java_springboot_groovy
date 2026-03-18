@@ -1,6 +1,6 @@
 import com.projectsbynipin.passwordruleengine.dto.ApiResponse
-import com.projectsbynipin.passwordruleengine.exception.FailedToCheckPasswordException
 import com.projectsbynipin.passwordruleengine.service.PasswordService
+import com.projectsbynipin.passwordruleengine.service.engine.GroovyRuleManager
 import com.projectsbynipin.passwordruleengine.service.impl.PasswordServiceImpl
 import org.codehaus.groovy.control.CompilerConfiguration
 import org.codehaus.groovy.control.customizers.SecureASTCustomizer
@@ -8,21 +8,24 @@ import spock.lang.Specification
 
 class PasswordTests extends Specification {
 
-    PasswordService passwordService;
+    PasswordService passwordService
+    GroovyRuleManager groovyRuleManager
 
     def setup() {
-        CompilerConfiguration compilerConfiguration = new CompilerConfiguration();
-        SecureASTCustomizer secureASTCustomizer = new SecureASTCustomizer();
-        secureASTCustomizer.setAllowedImports(Collections.emptyList());
+        CompilerConfiguration compilerConfiguration = new CompilerConfiguration()
+        SecureASTCustomizer secureASTCustomizer = new SecureASTCustomizer()
+        secureASTCustomizer.setAllowedImports(Collections.emptyList())
         secureASTCustomizer.setAllowedReceiversClasses(
                 List.of(
                         String.class,
                         Math.class
                 )
-        );
-        compilerConfiguration.addCompilationCustomizers(secureASTCustomizer);
-        passwordService = new PasswordServiceImpl(compilerConfiguration);
-        passwordService.scriptPath = "../scripts"
+        )
+        compilerConfiguration.addCompilationCustomizers(secureASTCustomizer)
+        groovyRuleManager = new GroovyRuleManager(compilerConfiguration)
+        groovyRuleManager.scriptPath = "../scripts"
+        groovyRuleManager.addScripts()
+        passwordService = new PasswordServiceImpl(groovyRuleManager)
     }
 
     def "Strong passwords returns true and no messages"() {
@@ -87,11 +90,11 @@ class PasswordTests extends Specification {
 
     def "Throws exception when scripts folder is missing"() {
         given:
-        passwordService.scriptPath = "../error"
+        groovyRuleManager.scriptPath = "../error"
         when:
-        passwordService.checkPasswordStrength("Abcd1234")
+        groovyRuleManager.addScripts()
         then:
-        thrown(FailedToCheckPasswordException)
+        thrown(FileNotFoundException)
     }
 
     def "Malicious scripts throw Security Exception"() {
@@ -99,7 +102,7 @@ class PasswordTests extends Specification {
         File testFile = new File("../scripts/security_tester.groovy");
         testFile.text = "System.exit(0)"
         when:
-        passwordService.checkPasswordStrength("Abcd1234")
+        groovyRuleManager.addScripts()
         then:
         thrown(SecurityException)
         cleanup: "Deleting the test file"
