@@ -19,6 +19,7 @@ import java.nio.file.*;
 import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static java.nio.file.StandardWatchEventKinds.*;
 
@@ -31,11 +32,13 @@ public class GroovyRuleManager implements InitializingBean {
     public String scriptPath;
 
     private final CompilerConfiguration compilerConfiguration;
-    private final ConcurrentHashMap<String, Class<?>> scripts = new ConcurrentHashMap<>();
+    private AtomicReference<Map<String, Class<?>>> scripts = new AtomicReference<>(new ConcurrentHashMap<>());
     private static final Logger logger = LoggerFactory.getLogger(GroovyRuleManager.class);
+    private final GroovyClassLoader groovyClassLoader;
 
     public GroovyRuleManager(CompilerConfiguration compilerConfiguration) {
         this.compilerConfiguration = compilerConfiguration;
+        this.groovyClassLoader = new GroovyClassLoader(GroovyRuleManager.class.getClassLoader(), compilerConfiguration);
     }
 
 
@@ -45,16 +48,15 @@ public class GroovyRuleManager implements InitializingBean {
     }
 
     public synchronized void addScripts() throws FileNotFoundException {
-        if (!scripts.isEmpty()) {
-            scripts.clear();
-        }
         File folder = new File(scriptPath);
         if (folder.exists()) {
             File[] files = folder.listFiles((dir, name) -> name.endsWith(".groovy"));
             if (files != null && files.length > 0) {
+                Map<String, Class<?>> temp = new ConcurrentHashMap<>();
                 for (File file : files) {
-                    groovyCompiler(file);
+                    groovyCompiler(file, temp);
                 }
+                scripts.set(Collections.unmodifiableMap(temp));
             } else {
                 logger.error("Groovy script files not found.");
                 throw new FileNotFoundException("Groovy script files not found.");
@@ -65,9 +67,9 @@ public class GroovyRuleManager implements InitializingBean {
         }
     }
 
-    public void groovyCompiler(File file) {
-        try (GroovyClassLoader groovyClassLoader = new GroovyClassLoader(GroovyRuleManager.class.getClassLoader(), compilerConfiguration)) {
-            scripts.put(file.getName(), groovyClassLoader.parseClass(file));
+    public void groovyCompiler(File file, Map<String, Class<?>> temp) {
+        try {
+            temp.put(file.getName(), groovyClassLoader.parseClass(file));
         } catch (MultipleCompilationErrorsException | SecurityException e) {
             logger.error("Security Exception : {} :- {}", file.getName(), e.getMessage());
             throw new SecurityException("Malicious Groovy script file.");
@@ -93,6 +95,7 @@ public class GroovyRuleManager implements InitializingBean {
                     }
                 }
                 if (removeCache) {
+                    groovyClassLoader.clearCache();
                     addScripts();
                 }
                 if (!watchKey.reset()) {
@@ -105,6 +108,6 @@ public class GroovyRuleManager implements InitializingBean {
     }
 
     public Map<String, Class<?>> getScripts() {
-        return Collections.unmodifiableMap(scripts);
+        return scripts.get();
     }
 }
