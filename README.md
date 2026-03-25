@@ -10,7 +10,17 @@ This project is a **dynamic password validation service** built using Spring Boo
 - Swagger UI for API documentation
 - Dockerized with volume mounting for external scripts
 
+## Technical Highlights
+- **Fast Performance**: Rules are compiled into Java bytecode and cached in memory.
+- **Live Updates**: Uses Java `WatchService` to detect file changes. Refreshes the cache.
+- **Secure Sandbox**: Uses `SecureASTCustomizer` to block malicious code.
+
 ## Build & Run
+
+### Prerequisites
+- Java 21 JDK
+- Docker
+
 Navigate to password-rule-engine folder
 ```bash
 cd password-rule-engine
