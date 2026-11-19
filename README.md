@@ -1,7 +1,7 @@
 # Password Rule Engine Application (Spring Boot + Groovy + Docker)
 
 ## Overview
-This project is a **dynamic password validation service** built using Spring Boot. It evaluates password strength based on external groovy rules, allowing to **add or modify password rules without redeploying the application**. The application is containerized with **Docker**, making it easy to run anywhere without setting up Java/Groovy locally.
+This project is a **dynamic password validation service** built using Spring Boot. It evaluates password strength based on external groovy rules, allowing to **add or modify password rules without redeploying the application**. The application is containerized using **Docker**.
 
 ## Features
 - REST API for password strength checks
